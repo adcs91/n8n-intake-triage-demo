@@ -42,7 +42,7 @@ handoff to a human when the rules should not decide.
 ## Honest limits
 
 I am early. These are my own builds, not client projects, and I do not present them as client work.
-I work async from UTC+8 and overlap EU and US mornings. I will tell you if a job is not worth doing
+I work async and overlap EU and US mornings. I will tell you if a job is not worth doing
 rather than take it and deliver something you cannot use.
 
 Contact: ppssht0070h71@outlook.com
