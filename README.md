@@ -44,6 +44,15 @@ And the execution history, both runs, with the failure path handled:
 - `workflow-intake-triage.json` — exported workflow, importable as-is
 - `shots/` — the screenshots above
 
+
+## Second build in this repo: Gumroad sales -> Airtable
+
+Same principle, different failure mode. Built without a Gumroad token against a local mock that
+reproduces the parts that break it: cursor pagination, a 429 on the first call, and a duplicate row.
+Run 1: the 429 fires, the node retries, 5 rows written. Run 2 with the same input: **0 inserted, 5 updated** -
+a re-run cannot create a second row.
+
+Full write-up: [gumroad-README.md](gumroad-README.md) - workflow: `gumroad-workflow.json` - raw log: `gumroad-log.txt`
 ## What this is not
 
 Not a client deployment, not production-hardened, and it uses no client data.
