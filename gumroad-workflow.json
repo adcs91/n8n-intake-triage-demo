@@ -1,0 +1,174 @@
+{
+  "name": "Gumroad Sales -> Airtable (mock-verified)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "name": "1 - Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:7071/v2/sales",
+        "options": {
+          "timeout": 10000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_key",
+              "value": "={{ $json.page_key || '' }}"
+            }
+          ]
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000002",
+      "name": "2 - Pull sales (cursor)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -340,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTriesMs": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const res = $input.first().json || {};\nconst sales = res.sales || [];\nreturn sales.map((s) => ({ json: {\n  sale_id: s.id,\n  email: s.email,\n  product_id: s.product_id,\n  product_name: s.product_name,\n  amount: (s.price / 100).toFixed(2),\n  currency: s.currency,\n  transaction_date: s.created_at,\n} }));"
+      },
+      "id": "b2000000-0000-4000-8000-000000000003",
+      "name": "3 - Map fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const seen = new Set();\nconst records = [];\nfor (const item of $input.all()) {\n  const id = item.json.sale_id;\n  if (!id || seen.has(id)) continue;\n  seen.add(id);\n  records.push(item.json);\n}\nreturn [{ json: { records, count: records.length } }];"
+      },
+      "id": "b2000000-0000-4000-8000-000000000004",
+      "name": "4 - Dedupe by sale_id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:7071/airtable/upsert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ records: $json.records }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000005",
+      "name": "5 - Upsert rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        340,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTriesMs": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { deduped_in_batch: $('4 - Dedupe by sale_id').first().json.count, upsert_response: $input.first().json } }];"
+      },
+      "id": "b2000000-0000-4000-8000-000000000006",
+      "name": "6 - Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "1 - Start": {
+      "main": [
+        [
+          {
+            "node": "2 - Pull sales (cursor)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 - Pull sales (cursor)": {
+      "main": [
+        [
+          {
+            "node": "3 - Map fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "3 - Map fields": {
+      "main": [
+        [
+          {
+            "node": "4 - Dedupe by sale_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4 - Dedupe by sale_id": {
+      "main": [
+        [
+          {
+            "node": "5 - Upsert rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 - Upsert rows": {
+      "main": [
+        [
+          {
+            "node": "6 - Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

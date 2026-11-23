@@ -1,0 +1,9 @@
+# Raw log from the two runs (mock Gumroad API + mock Airtable upsert)
+# run 1: first call is a deliberate 429, the node retries, then writes 5 rows
+# run 2: same payload again -> 0 inserted, 5 updated (idempotent by sale_id)
+
+2026-11-23T07:38:11.803Z GET /v2/sales call=1 page_key=-
+2026-11-23T07:38:12.965Z GET /v2/sales call=2 page_key=-
+2026-11-23T07:38:13.516Z POST /airtable/upsert in=5 inserted=5 updated=0 total=5
+2026-11-23T07:39:05.930Z GET /v2/sales call=3 page_key=-
+2026-11-23T07:39:06.109Z POST /airtable/upsert in=5 inserted=0 updated=5 total=5
