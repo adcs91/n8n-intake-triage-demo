@@ -1,0 +1,269 @@
+{
+  "name": "Intake Triage - Demo (synthetic data)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "inquiry",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "1 - Receive Inquiry",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        0
+      ],
+      "webhookId": "a1000000-0000-4000-8000-0000000000aa",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTriesMs": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const b = $json.body ?? $json;\nconst text = String(b.message ?? '');\nreturn { json: {\n  name: b.name ?? 'unknown',\n  email: b.email ?? 'unknown',\n  message: text,\n  qty: b.qty ?? null,\n  deadline: b.deadline ?? null,\n  received_at: new Date().toISOString(),\n} };"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "2 - Parse Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTriesMs": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const m = String($json.message).toLowerCase();\nconst price = /price|quote|cost|how much/.test(m);\nconst spec = /spec|datasheet|drawing|cad/.test(m);\nconst lead = /lead time|delivery|when can|eta/.test(m);\nconst stock = /in stock|available|stock/.test(m);\nconst hits = [price, spec, lead, stock].filter(Boolean).length;\nconst tier = hits >= 3 ? 'A' : hits >= 1 ? 'B' : 'C';\nconst reason = hits >= 3\n  ? 'multi-question inquiry: price + spec + lead time + stock'\n  : hits >= 1 ? 'single-question inquiry' : 'no commercial intent detected';\nreturn { json: { ...$json, hits, tier, reason } };"
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "3 - Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        0
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c1",
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "A",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "A - qualified"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c2",
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "B",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "B - human"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "C - parked"
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "4 - Route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        100,
+        0
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:9/crm-record",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "5 - Write CRM Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        340,
+        -200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTriesMs": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { ...$json, action: 'queued for human review', queued_at: new Date().toISOString() } };"
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "6 - Human Queue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        20
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { ...$json, action: 'parked' } };"
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "7 - Park",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        240
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {},
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "9 - Alert (error path)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -200
+      ],
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "1 - Receive Inquiry": {
+      "main": [
+        [
+          {
+            "node": "2 - Parse Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 - Parse Fields": {
+      "main": [
+        [
+          {
+            "node": "3 - Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 - Score": {
+      "main": [
+        [
+          {
+            "node": "4 - Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4 - Route": {
+      "main": [
+        [
+          {
+            "node": "5 - Write CRM Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6 - Human Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "7 - Park",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 - Write CRM Record": {
+      "main": [
+        [],
+        [
+          {
+            "node": "9 - Alert (error path)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "id": "BjPRqbZfIybCZm1V"
+}
